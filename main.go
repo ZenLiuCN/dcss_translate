@@ -267,11 +267,16 @@ func (s *Service) register() {
 	mux.HandleFunc("GET /", page)
 	mux.HandleFunc("GET /index.html", page)
 	mux.HandleFunc("GET /entries/{catalog}/{topic}", onFailure(s.entries))
+	mux.HandleFunc("POST /auto", onFailure(s.checkDone))
+	mux.HandleFunc("OPTIONS /auto", onFailure(s.entries))
 	mux.HandleFunc("POST /entry/{id}", onFailure(s.entry))
 	mux.HandleFunc("POST /entry/{id}/done", onFailure(s.entryDone))
 	mux.HandleFunc("OPTIONS /entry/{id}/done", onFailure(s.entry))
 	mux.HandleFunc("OPTIONS /entry/{id}", onFailure(s.entry))
 	mux.HandleFunc("GET /entries/", onFailure(s.catalogs))
+}
+func (s *Service) checkDone(w http.ResponseWriter, r *http.Request) {
+	one(s.conn.Exec("UPDATE names set done=true where raw='' and eng!='' and trans!='' "))
 }
 func (s *Service) entry(w http.ResponseWriter, r *http.Request) {
 	var data Record

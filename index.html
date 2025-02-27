@@ -3381,6 +3381,12 @@
             }
             console.error("update entry fail", e, await r.json())
         }
+        const autoDone=(busy)=>{
+            busy.val=true
+            fetch(`${host}/auto`, {
+                method: 'POST',
+            }).finally($=>busy.val=false)
+        }
         const actionBtn = 'width:6em;height:2em;padding:0.2em 0em .0em 0em'
         /**
          *
@@ -3576,8 +3582,9 @@
             : div(...Object.keys(catalog.val).map(i => card(i, catalog.val[i])))
         const loading = () => div({ariaBusy: "true"}, 'Loading')
         init()
+        const autoDoneRun=vans.state(false)
         vans.add(document.body, () => article({class: "container-fluid"},
-            div({role: "group"},
+            div({role: "group",style:"align-items: center"},
                 label(input({
                     type: "checkbox",
                     role: "switch",
@@ -3593,6 +3600,10 @@
                     checked: normal,
                     onchange: e => normal.val = e.target.checked
                 }), normal.val ? "Normal" : "Review"),
+                div({role:"button",
+                    "data-tooltip":"convert all translated entries to finished",
+                    'data-placement':"bottom",
+                    ariaBusy:autoDoneRun,onclick:()=>autoDone(autoDoneRun)},"Automatic Finish")
             ), entries()))
 
     })();
