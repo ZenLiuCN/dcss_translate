@@ -308,9 +308,9 @@ func (s *Service) entries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var data []Record
-	sql := "SELECT * FROM names where raw='' and catalog=$1 and topic=$2 order by id limit $3 offset $4"
+	sql := "SELECT * FROM names where raw='' and eng!='' and catalog=$1 and topic=$2 order by id limit $3 offset $4"
 	if done {
-		sql = "SELECT * FROM names where raw='' and catalog=$1 and topic=$2 and done=false order by id limit $3 offset $4"
+		sql = "SELECT * FROM names where raw='' and eng!=''  and catalog=$1 and topic=$2 and done=false order by id limit $3 offset $4"
 	}
 	none(s.conn.Select(&data, sql, catalog, topic, size, page*size))
 	var m = json.NewEncoder(w)
@@ -329,7 +329,7 @@ func (s *Service) catalogs(w http.ResponseWriter, r *http.Request) {
 	none(s.conn.Select(&topic, `
 SELECT  catalog,  topic,  SUM(CASE WHEN done THEN 1 ELSE 0 END) as done,  COUNT(*) as total
 FROM  names 
-WHERE  raw = '' 
+WHERE  raw = ''  and eng!='' 
 GROUP BY catalog,  topic`))
 	m := make(map[string][]map[string]any)
 	for _, info := range topic {
