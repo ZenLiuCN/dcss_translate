@@ -9,6 +9,7 @@ import (
 	"flag"
 	sqlx "github.com/jmoiron/sqlx"
 	"io/fs"
+	"log"
 	_ "modernc.org/sqlite"
 	"net/http"
 	"os"
@@ -289,6 +290,8 @@ func (s *Service) entryDone(w http.ResponseWriter, r *http.Request) {
 	none(json.NewDecoder(r.Body).Decode(&data))
 	if len(data.Trans) == 0 {
 		w.WriteHeader(200)
+		log.Printf("not store %s ", string(one(json.Marshal(data))))
+		return
 	}
 	_ = one(s.conn.Exec("UPDATE names SET trans=$1 , done=true WHERE id=$2 ", data.Trans, data.Id))
 	w.WriteHeader(200)
