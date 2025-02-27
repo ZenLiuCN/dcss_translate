@@ -112,7 +112,7 @@ func connect() *sqlx.DB {
 	}
 	row.Close()
 	if n == 0 {
-		_ = one(conn.Exec("CREATE TABLE names (id int,catalog text,topic text,line int,endline int,raw text,type text,eng text, trans text ,done bool default false)"))
+		_ = one(conn.Exec("CREATE TABLE names (id INTEGER PRIMARY KEY AUTOINCREMENT,catalog text,topic text,line int,endline int,raw text,type text,eng text, trans text ,done bool default false)"))
 	}
 	return conn
 }
@@ -431,8 +431,8 @@ func imports() {
 	for _, records := range m {
 		//goland:noinspection SqlResolve
 		one(stmt.NamedExec(`
-INSERT INTO names(id,catalog,topic,line,endline,raw,type,eng,trans) 
-values (:id,:catalog,:topic,:line,:endline,:raw,:type,:eng,:trans)
+INSERT INTO names(catalog,topic,line,endline,raw,type,eng,trans) 
+VALUES (:catalog,:topic,:line,:endline,:raw,:type,:eng,:trans)
 `, records))
 	}
 
@@ -440,10 +440,9 @@ values (:id,:catalog,:topic,:line,:endline,:raw,:type,:eng,:trans)
 func read(catalog, p string, out map[string][]*Record) error {
 	return walk(p, func(topic string, path string) {
 		split(path, func(key string, b *strings.Builder, comment string, be, ed int) {
-			n := len(out[catalog])
 			if comment == "" {
 				out[catalog] = append(out[catalog], &Record{
-					Id:      n,
+
 					Line:    be,
 					EndLine: ed,
 					Catalog: catalog,
@@ -453,7 +452,7 @@ func read(catalog, p string, out map[string][]*Record) error {
 				})
 			} else {
 				out[catalog] = append(out[catalog], &Record{
-					Id:      n,
+
 					Line:    be,
 					EndLine: ed,
 					Raw:     comment,
@@ -483,9 +482,7 @@ func merge(catalog, p string, out map[string][]*Record) error {
 			if fn != nil {
 				fn.Trans = b.String()
 			} else {
-				n := len(out[catalog])
 				out[catalog] = append(out[catalog], &Record{
-					Id:      n,
 					Line:    be,
 					EndLine: ed,
 					Catalog: catalog,
@@ -535,7 +532,7 @@ func split(path string, onEntry func(key string, entry *strings.Builder, comment
 				b.WriteRune('\n')
 			}
 		case line[0] == '#':
-			if key == "" {
+			if key == "" || (len(line) > 1 && line[1] == '#') {
 				onEntry(key, nil, line, be, ed)
 				be = ed
 			} else {
