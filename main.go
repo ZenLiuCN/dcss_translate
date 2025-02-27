@@ -282,15 +282,18 @@ func (s *Service) entry(w http.ResponseWriter, r *http.Request) {
 func (s *Service) entryDone(w http.ResponseWriter, r *http.Request) {
 	var data Record
 	none(json.NewDecoder(r.Body).Decode(&data))
+	if len(data.Trans) == 0 {
+		w.WriteHeader(200)
+	}
 	_ = one(s.conn.Exec("UPDATE names SET trans=$1 , done=true WHERE id=$2 ", data.Trans, data.Id))
 	w.WriteHeader(200)
 }
 func (s *Service) entries(w http.ResponseWriter, r *http.Request) {
 	catalog := r.PathValue("catalog")
 	topic := r.PathValue("topic")
-	done := false
-	if r.URL.Query().Has("done") {
-		done = int(one(strconv.ParseInt(r.URL.Query().Get("done"), 10, 32))) > 0
+	prog := false
+	if r.URL.Query().Has("prog") {
+		prog = int(one(strconv.ParseInt(r.URL.Query().Get("prog"), 10, 32))) != 0
 	}
 	page := 0
 	size := 10
@@ -309,7 +312,7 @@ func (s *Service) entries(w http.ResponseWriter, r *http.Request) {
 	}
 	var data []Record
 	sql := "SELECT * FROM names where raw='' and eng!='' and catalog=$1 and topic=$2 order by id limit $3 offset $4"
-	if done {
+	if prog {
 		sql = "SELECT * FROM names where raw='' and eng!=''  and catalog=$1 and topic=$2 and done=false order by id limit $3 offset $4"
 	}
 	none(s.conn.Select(&data, sql, catalog, topic, size, page*size))

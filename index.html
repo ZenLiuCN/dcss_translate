@@ -3365,8 +3365,9 @@
          * }} Entry
          */
 
-        const {div, details, summary,label,input, article, table, thead, th, tbody, tr, td, textarea} = vans.tags
-        const all=vans.state(true)
+        const {div, details, summary, label, input, article, table, thead, th, tbody, tr, td, textarea} = vans.tags
+        const prog = vans.state(true)
+        const normal = vans.state(true)
         const submit = async (e, done) => {
             const r = await fetch(`${host}/entry/${e.id}${done ? "/done" : ""}`, {
                 method: 'POST',
@@ -3380,28 +3381,27 @@
             }
             console.error("update entry fail", e, await r.json())
         }
-        const actionBtn='width:6em;height:2em;padding:0.2em 0em .0em 0em'
+        const actionBtn = 'width:6em;height:2em;padding:0.2em 0em .0em 0em'
         /**
          *
          * @param {Entry}e
          * @returns {ChildDom[]}
          */
         const render = (e) => {
-            if (e.done)
+            if (e.done && normal.val)
                 return [tr(
                     td(div(e.type)),
                     td(div(e.id)),
                     td(div({class: "grid"},
-                        div({style:"padding:.5em 0em 0em 0em"},'Already Finished'),
+                        div({style: "padding:.5em 0em 0em 0em"}, 'Already Finished'),
                         div({
                             role: 'button',
-                            style: 'width:8em;height:2em;padding:0.2em 0em .0em 0em',
+                            style: actionBtn,
                             onclick: () => {
                                 e.done = false
                             }
                         }, "ReEdit")))
-                )
-                ]
+                )]
             const submitting = vans.state(false)
             const sync = vans.state(false)
             const trans = vans.state(vans.raw(e).trans)
@@ -3426,47 +3426,51 @@
                 value: () => trans.val
             })
             const observer = new ResizeObserver(e => {
-                e0.style.height=e1.style.height
+                e0.style.height = e1.style.height
             })
             observer.observe(e1)
             return [
-                tr(td(div(e.type)), td(div(e.id)),
-                    td(div({class: "grid"},
+                tr(td(div({style: `${e.done ? "color:deeppink;font-size:1rem" : "font-size:1rem"}`}, e.type)), td(div(e.id)),
+                    td(div({role: 'group'},
                         div({
                             role: 'button',
                             ariaBusy: () => submitting.val || sync.val,
-                            style:actionBtn, onclick: () => {
-                               trans.val=e.eng
+                            style: actionBtn,
+                            onclick: () => {
+                                trans.val = e.eng
                             }
                         }, 'Copy'),
                         div({
                             role: 'button',
                             ariaBusy: () => submitting.val || sync.val,
-                            style:actionBtn , onclick: () => {
+                            style: actionBtn, onclick: () => {
                                 submitting.val = true
                                 submit(e, false).finally(_ => {
                                     submitting.val = false
+                                    e.done = false
                                 })
                             }
                         }, 'Save'),
                         div({
                             role: 'button',
                             ariaBusy: () => submitting.val || sync.val,
-                            style:actionBtn, onclick: () => {
+                            style: actionBtn, onclick: () => {
                                 submitting.val = true
                                 submit(e, true).finally(_ => {
                                     submitting.val = false
                                     e.done = true
                                 })
                             }
-                        }, 'Finish')))),
+                        }, 'Finish'))
+                    )
+                ),
                 () => {
-                if(submitting.val){
-                    observer.unobserve(e1)
-                    return loading()
-                }
+                    if (submitting.val) {
+                        observer.unobserve(e1)
+                        return loading()
+                    }
                     observer.observe(e1)
-                    return  tr(td(e0), td({colSpan: 2}, e1))
+                    return tr(td(e0), td({colSpan: 2}, e1))
                 }
             ]
         }
@@ -3485,7 +3489,7 @@
             console.error("fetch entries fail", await r.json())
         }
         const dataLoad = async (catalog, topic, page) => {
-            const r = await fetch(`${host}/entries/${catalog}/${topic}?page=${page.val += 1}&done=${all.val?"0":"1"}`)
+            const r = await fetch(`${host}/entries/${catalog}/${topic}?page=${page.val += 1}&prog=${prog.val ? "1" : "0"}`)
             if (r.status === 200) {
                 return await r.json()
             }
@@ -3527,39 +3531,39 @@
             summary({role: "button"}, catalog),
             article(
                 topics.map(t => {
-                    const topic=t.topic
-                    const total=t.total
-                    const done=t.done
+                    const topic = t.topic
+                    const total = t.total
+                    const done = t.done
                     const busy = vans.state(false)
                     const more = vans.state(true)
                     const page = vans.state(0)
                     const data = vans.reactive([])
-                    const progress=vans.derive(()=>data.length===0
-                        ?`[ ${done} of ${total} ]`
-                        :`[ ${data.map(x=>x.done?1:0).reduce((n, v)=>n+v)}/${data.length} of ${done}/${total} ]`)
+                    const progress = vans.derive(() => data.length === 0
+                        ? `[ ${done} of ${total} ]`
+                        : `[ ${data.map(x => x.done ? 1 : 0).reduce((n, v) => n + v)}/${data.length} of ${done}/${total} ]`)
                     const loader = nextData(catalog, topic, more, busy, data, page)
-                    let last=false
-                    vans.derive(()=>{
-                        if(all.val!==last && data.length>0){
-                            data.splice(0,data.length)
-                            page.val=0
+                    let last = true
+                    vans.derive(() => {
+                        if (prog.val !== last && data.length > 0) {
+                            data.splice(0, data.length)
+                            page.val = 0
                             loader()
                         }
-                        last=all.val
+                        last = prog.val
                     })
                     return details(
                         summary({
                             role: "button", class: "outline", onclick: () => {
                                 if (!data.length) loader()
                             }
-                        }, ()=>topic+ progress.val),
+                        }, () => topic + progress.val),
                         () => busy.val ? loading() : table(
                             thead(
                                 th("English"),
                                 th({colSpan: 2}, "Translation"),
                             ),
                             tbody(
-                                ...[...data.map((d) => render(d)).flat(), nextPage(loader, more)]
+                                ...[...(prog.val ? data.filter(p => !p.done) : data).map((d) => render(d)).flat(), nextPage(loader, more)]
                             )
                         )
                     )
@@ -3573,14 +3577,23 @@
         const loading = () => div({ariaBusy: "true"}, 'Loading')
         init()
         vans.add(document.body, () => article({class: "container-fluid"},
-            label(input({
-                type: "checkbox",
-                role: "switch",
-                checked:all,
-                onchange: e => {
-                    all.val = e.target.checked
-                }
-            }), all.val?"All":"Progress Only"),entries()))
+            div({role: "group"},
+                label(input({
+                    type: "checkbox",
+                    role: "switch",
+                    checked: prog,
+                    onchange: e => {
+                        prog.val = e.target.checked
+                        if (prog.val) normal.val = true
+                    }
+                }), prog.val ? "Progress" : "All"),
+                label(input({
+                    type: "checkbox",
+                    role: "switch",
+                    checked: normal,
+                    onchange: e => normal.val = e.target.checked
+                }), normal.val ? "Normal" : "Review"),
+            ), entries()))
 
     })();
 </script>
