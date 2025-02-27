@@ -288,6 +288,10 @@ func (s *Service) entryDone(w http.ResponseWriter, r *http.Request) {
 func (s *Service) entries(w http.ResponseWriter, r *http.Request) {
 	catalog := r.PathValue("catalog")
 	topic := r.PathValue("topic")
+	done := false
+	if r.URL.Query().Has("done") {
+		done = int(one(strconv.ParseInt(r.URL.Query().Get("done"), 10, 32))) > 0
+	}
 	page := 0
 	size := 10
 	if r.URL.Query().Has("page") {
@@ -304,7 +308,11 @@ func (s *Service) entries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var data []Record
-	none(s.conn.Select(&data, "SELECT * FROM names where raw='' and catalog=$1 and topic=$2 order by id limit $3 offset $4", catalog, topic, size, page*size))
+	sql := "SELECT * FROM names where raw='' and catalog=$1 and topic=$2 order by id limit $3 offset $4"
+	if done {
+		sql = "SELECT * FROM names where raw='' and catalog=$1 and topic=$2 and done=false order by id limit $3 offset $4"
+	}
+	none(s.conn.Select(&data, sql, catalog, topic, size, page*size))
 	var m = json.NewEncoder(w)
 	none(m.Encode(data))
 }
@@ -312,14 +320,24 @@ func (s *Service) entries(w http.ResponseWriter, r *http.Request) {
 type Info struct {
 	Topic   string `db:"topic"`
 	Catalog string `db:"catalog"`
+	Done    int    `db:"done"`
+	Total   int    `db:"total"`
 }
 
 func (s *Service) catalogs(w http.ResponseWriter, r *http.Request) {
 	var topic []Info
-	none(s.conn.Select(&topic, "SELECT catalog,topic FROM names where raw='' group by catalog,topic"))
-	m := make(map[string][]string)
+	none(s.conn.Select(&topic, `
+SELECT  catalog,  topic,  SUM(CASE WHEN done THEN 1 ELSE 0 END) as done,  COUNT(*) as total
+FROM  names 
+WHERE  raw = '' 
+GROUP BY catalog,  topic`))
+	m := make(map[string][]map[string]any)
 	for _, info := range topic {
-		m[info.Catalog] = append(m[info.Catalog], info.Topic)
+		m[info.Catalog] = append(m[info.Catalog], map[string]any{
+			"topic": info.Topic,
+			"done":  info.Done,
+			"total": info.Total,
+		})
 	}
 	none(json.NewEncoder(w).Encode(m))
 }

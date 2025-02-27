@@ -3364,17 +3364,9 @@
          * done:boolean
          * }} Entry
          */
-        /**
-         *
-         * @param  {function(*):boolean} f
-         * @returns {function(*): boolean}
-         */
-        const not = f => v => !f(v)
 
-
-
-        const {div, details, summary, article, table, thead, th, tbody, tr, td, textarea} = vans.tags
-
+        const {div, details, summary,label,input, article, table, thead, th, tbody, tr, td, textarea} = vans.tags
+        const all=vans.state(true)
         const submit = async (e, done) => {
             const r = await fetch(`${host}/entry/${e.id}${done ? "/done" : ""}`, {
                 method: 'POST',
@@ -3478,7 +3470,10 @@
                 }
             ]
         }
-
+        /**
+         *
+         * @type {vans.State<Record<string,Array<{topic:string,done:number,total:number}>>>}
+         */
         const catalog = vans.state({})
         const catalogReady = vans.state(false)
         const host = ""
@@ -3490,7 +3485,7 @@
             console.error("fetch entries fail", await r.json())
         }
         const dataLoad = async (catalog, topic, page) => {
-            const r = await fetch(`${host}/entries/${catalog}/${topic}?page=${page.val += 1}`)
+            const r = await fetch(`${host}/entries/${catalog}/${topic}?page=${page.val += 1}&done=${all.val?"0":"1"}`)
             if (r.status === 200) {
                 return await r.json()
             }
@@ -3525,19 +3520,33 @@
         /**
          *
          * @param {string}catalog
-         * @param {string[]}topics
+         * @param {Array<{topic:string,done:number,total:number}>}topics
          * @returns {vans.ChildDom}
          */
         const card = (catalog, topics) => () => details(
             summary({role: "button"}, catalog),
             article(
-                topics.map(topic => {
+                topics.map(t => {
+                    const topic=t.topic
+                    const total=t.total
+                    const done=t.done
                     const busy = vans.state(false)
                     const more = vans.state(true)
                     const page = vans.state(0)
                     const data = vans.reactive([])
-                    const progress=vans.derive(()=>data.length===0?'':`[${data.map(x=>x.done?1:0).reduce((n,v)=>n+v)}/${data.length}]`)
+                    const progress=vans.derive(()=>data.length===0
+                        ?`[ ${done} of ${total} ]`
+                        :`[ ${data.map(x=>x.done?1:0).reduce((n, v)=>n+v)}/${data.length} of ${done}/${total} ]`)
                     const loader = nextData(catalog, topic, more, busy, data, page)
+                    let last=false
+                    vans.derive(()=>{
+                        if(all.val!==last && data.length>0){
+                            data.splice(0,data.length)
+                            page.val=0
+                            loader()
+                        }
+                        last=all.val
+                    })
                     return details(
                         summary({
                             role: "button", class: "outline", onclick: () => {
@@ -3550,7 +3559,7 @@
                                 th({colSpan: 2}, "Translation"),
                             ),
                             tbody(
-                                ...[...data.map((d) => render(d)).flat(), nextPage(loader, busy)]
+                                ...[...data.map((d) => render(d)).flat(), nextPage(loader, more)]
                             )
                         )
                     )
@@ -3561,11 +3570,17 @@
         const entries = () => !catalogReady.val ?
             loading()
             : div(...Object.keys(catalog.val).map(i => card(i, catalog.val[i])))
-
-
         const loading = () => div({ariaBusy: "true"}, 'Loading')
         init()
-        vans.add(document.body, () => article({class: "container-fluid"}, entries()))
+        vans.add(document.body, () => article({class: "container-fluid"},
+            label(input({
+                type: "checkbox",
+                role: "switch",
+                checked:all,
+                onchange: e => {
+                    all.val = e.target.checked
+                }
+            }), all.val?"All":"Progress Only"),entries()))
 
     })();
 </script>
