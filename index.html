@@ -3536,13 +3536,14 @@
                     const more = vans.state(true)
                     const page = vans.state(0)
                     const data = vans.reactive([])
+                    const progress=vans.derive(()=>data.length===0?'':`[${data.map(x=>x.done?1:0).reduce((n,v)=>n+v)}/${data.length}]`)
                     const loader = nextData(catalog, topic, more, busy, data, page)
                     return details(
                         summary({
                             role: "button", class: "outline", onclick: () => {
                                 if (!data.length) loader()
                             }
-                        }, topic),
+                        }, ()=>topic+ progress.val),
                         () => busy.val ? loading() : table(
                             thead(
                                 th("English"),
