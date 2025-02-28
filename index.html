@@ -3624,20 +3624,21 @@
                                                     }
                                                     return o
                                                 }, [])
-                                                code=false
                                                 const val = data.filter(p => !p.done).reduce((m, v, i) => {
                                                     m.set(i, v)
                                                     return m
                                                 }, new Map)
                                                 blocks.forEach((b, i) => {
                                                     let v = "";
+                                                    code=false
                                                     const last = b.length - 1
                                                     b.filter(l => l.length > 0).forEach((l, x) => {
                                                         if(l==='\n'||l.length===0) return
                                                         v += l
                                                         if(!code && v.includes("{{")) code=true
                                                         if(code && v.includes("}}")) code=false
-                                                        if (!code &&!l.startsWith("#") &&!l.startsWith("w:")) v += "\n"
+                                                        if(!topic.includes("quotes"))
+                                                            if (!code &&!l.startsWith("#") &&!l.startsWith("w:")) v += "\n"
                                                         if(x < last) v+="\n"
                                                     })
                                                     const x = val.get(i)
