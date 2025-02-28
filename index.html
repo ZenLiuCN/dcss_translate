@@ -3370,14 +3370,16 @@
          */
 
         const {div, details, summary, label, input, article, table, thead, th, tbody, tr, td, textarea} = vans.tags
+        const paged = vans.state(parseInt(localStorage.getItem("PageSize")??"10"))
+        vans.derive(()=>localStorage.setItem("PageSize",paged.val.toString()))
         const prog = vans.state(true)
         const normal = vans.state(true)
 
-        const prompt = vans.state(localStorage.getItem("prompt")??"")
-        vans.derive(()=>{
-            localStorage.setItem("prompt",prompt.val)
+        const prompt = vans.state(localStorage.getItem("prompt") ?? "")
+        vans.derive(() => {
+            localStorage.setItem("prompt", prompt.val)
         })
-        const autoDoneRun=vans.state(false)
+        const autoDoneRun = vans.state(false)
         /**
          *
          * @type {vans.State<Catalogs>}
@@ -3390,7 +3392,7 @@
          * @param {string}s
          * @returns {number}
          */
-        const computeLines=s=>s.split('\n').length
+        const computeLines = s => s.split('\n').length
         const submit = async (e, done) => {
             const r = await fetch(`${host}/entry/${e.id}${done ? "/done" : ""}`, {
                 method: 'POST',
@@ -3404,11 +3406,11 @@
             }
             console.error("update entry fail", e, await r.json())
         }
-        const autoDone=(busy)=>{
-            busy.val=true
+        const autoDone = (busy) => {
+            busy.val = true
             fetch(`${host}/auto`, {
                 method: 'POST',
-            }).finally($=>busy.val=false)
+            }).finally($ => busy.val = false)
         }
         const actionBtn = 'width:6em;height:2em;padding:0.2em 0em .0em 0em'
         /**
@@ -3434,9 +3436,12 @@
             const submitting = vans.state(false)
             const sync = vans.state(false)
             const trans = vans.state(vans.raw(e).trans)
+            vans.derive(() => {
+                trans.val = e.trans
+            })
             let timeout = null
-            const lines=computeLines(e.eng)
-            const handleValue= x => {
+            const lines = computeLines(e.eng)
+            const handleValue = x => {
                 trans.val = x.target.value
                 if (timeout) clearTimeout(timeout)
                 sync.val = true
@@ -3447,17 +3452,17 @@
                 }, 1000)
             }
             const e0 = textarea({
-                wrap:"off",
+                wrap: "off",
                 style: "resize:none",
-                rows:lines,
+                rows: lines,
                 readOnly: true
             }, e.eng)
             const e1 = textarea({
-                wrap:"off",
+                wrap: "off",
                 style: "resize:vertical",
-                rows:lines,
+                rows: lines,
                 placeholder: "your translation",
-                onparse:handleValue,
+                onparse: handleValue,
                 oninput: handleValue,
                 value: () => trans.val
             })
@@ -3475,7 +3480,7 @@
                             style: actionBtn,
                             onclick: () => {
                                 trans.val = e.eng
-                                e.trans=e.eng
+                                e.trans = e.eng
                             }
                         }, 'Copy'),
                         div({
@@ -3514,7 +3519,6 @@
         }
 
 
-
         const catalogLoad = async () => {
             const r = await fetch(`${host}/entries/`)
             if (r.status === 200) {
@@ -3523,7 +3527,7 @@
             console.error("fetch entries fail", await r.json())
         }
         const dataLoad = async (catalog, topic, page) => {
-            const r = await fetch(`${host}/entries/${catalog}/${topic}?page=${page.val += 1}&prog=${prog.val ? "1" : "0"}`)
+            const r = await fetch(`${host}/entries/${catalog}/${topic}?page=${page.val += 1}&size=${paged.val >= 10 ? paged.val : 10}&prog=${prog.val ? "1" : "0"}`)
             if (r.status === 200) {
                 return await r.json()
             }
@@ -3533,7 +3537,7 @@
             if (!more.val) return
             busy.val = true
             dataLoad(catalog, topic, page).then(r => {
-                if (!r || r.length < 10) {
+                if (!r || r.length < paged.val) {
                     more.val = false
                 }
                 if (r) data.push(...r)
@@ -3597,9 +3601,53 @@
                                 th({colSpan: 2}, "Translation"),
                             ),
                             tbody(
-                                prog.val? tr(
-                                    td({colSpan:3},div({role:"button",onclick:()=>navigator.clipboard.writeText(prompt.val+"\n"+data.filter(p=>!p.done).map(p=>p.eng).join("\n----\n")).then(_=>alert("already copy to clipboard"))},"Copy To Clipboard (with prompt text at first)"))
-                                ):undefined,
+                                prog.val ? tr(
+                                    td({colSpan: 2}, div({
+                                        role: "button",
+                                        "data-tooltip":"copy english as prompt for LLM, use '----' divide each key.",
+                                        onclick: () => navigator.clipboard.writeText(prompt.val + "\n" + data.filter(p => !p.done).map(p => p.eng).join("\n----\n")).then(_ => alert("already copy to clipboard"))
+                                    }, "Copy To Clipboard (with prompt text at first)")),
+                                    td({colSpan: 1}, div({
+                                        role: "button",
+                                        "data-tooltip":"parse translate result from LLVM, use '----' divide each key.",
+                                        onclick: () => navigator.clipboard.readText()
+                                            .then(x => {
+                                                const blocks = x.split("\n").reduce((o, v) => {
+                                                    v = v.trim()
+                                                    if (o.length === 0) o.push([])
+                                                    if (v === '----') o.push([])
+                                                    else {
+                                                        o[o.length - 1].push(v)
+                                                    }
+                                                    return o
+                                                }, [])
+                                                const val = data.filter(p => !p.done).reduce((m, v, i) => {
+                                                    m.set(i, v)
+                                                    return m
+                                                }, new Map)
+                                                blocks.forEach((b, i) => {
+                                                    let v = "";
+                                                    const last = b.length - 1
+                                                    let code=false
+                                                    b.filter(l => l.length > 0).forEach((l, x) => {
+                                                        if(l==='\n'||l.length===0) return
+                                                        v += l
+                                                        if(l.endsWith("{{")) code=true
+                                                        else if(code && l.startsWith("}}")) code=false
+
+                                                        if (!code &&!l.startsWith("#") &&!l.startsWith("w:")) v += "\n"
+                                                        if(x < last) v+="\n"
+                                                    })
+                                                    const x = val.get(i)
+                                                    if (!x) throw Error("missing " + i)
+                                                    x.trans = v.trimEnd()
+                                                })
+                                                return blocks.length
+                                            })
+                                            .then(v => alert(`Filled ${v} translations `))
+                                            .catch(v => alert(`Filled translations failed: ${v.toString()} `))
+                                    }, "Parse Translation"))
+                                ) : undefined,
                                 ...[...(prog.val ? data.filter(p => !p.done) : data).map((d) => render(d)).flat(), nextPage(loader, more)]
                             )
                         )
@@ -3615,30 +3663,44 @@
         init()
 
         vans.add(document.body, () => article({class: "container-fluid"},
-            div({role: "group",style:"align-items: center"},
+            div({class: "grid"},
+                div(div("mode"),
+                    label(input({
+                        type: "checkbox",
+                        role: "switch",
+                        checked: prog,
+                        onchange: e => {
+                            prog.val = e.target.checked
+                            if (prog.val) normal.val = true
+                        }
+                    }), prog.val ? "Progress" : "All"),
+                    label(input({
+                        type: "checkbox",
+                        role: "switch",
+                        checked: normal,
+                        onchange: e => normal.val = e.target.checked
+                    }), normal.val ? "Normal" : "Review")),
                 label(input({
-                    type: "checkbox",
-                    role: "switch",
-                    checked: prog,
-                    onchange: e => {
-                        prog.val = e.target.checked
-                        if (prog.val) normal.val = true
-                    }
-                }), prog.val ? "Progress" : "All"),
-                label(input({
-                    type: "checkbox",
-                    role: "switch",
-                    checked: normal,
-                    onchange: e => normal.val = e.target.checked
-                }), normal.val ? "Normal" : "Review"),
-                div({role:"button",
-                    "data-tooltip":"convert all translated entries to finished",
-                    'data-placement':"bottom",
-                    ariaBusy:autoDoneRun,onclick:()=>autoDone(autoDoneRun)},"Automatic Finish"),
-                div(div("prompt"),textarea({ wrap:"off",
+                    type: "range",
+                    min: 10,
+                    max: 200,
+                    step: 10,
+                    value: paged,
+                    onchange: e => paged.val = +e.target.value
+                }), "Page Size:" + paged.val),
+                div({
+                    role: "button",
+                    "data-tooltip": "convert all translated entries to finished",
+                    'data-placement': "bottom",
+                    ariaBusy: autoDoneRun, onclick: () => autoDone(autoDoneRun)
+                }, "Finish All Translated"),
+                div(div("prompt"), textarea({
+                    wrap: "off",
                     style: "resize:vertical",
-                    onchange:e=>prompt.val=e.target.value},prompt.val)),
-            ), entries()))
+                    onchange: e => prompt.val = e.target.value
+                }, prompt.val)),
+            ),
+            entries()))
 
     })();
 </script>
