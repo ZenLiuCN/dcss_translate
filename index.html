@@ -3612,15 +3612,19 @@
                                         "data-tooltip":"parse translate result from LLVM, use '----' divide each key.",
                                         onclick: () => navigator.clipboard.readText()
                                             .then(x => {
+                                                let code=false
                                                 const blocks = x.split("\n").reduce((o, v) => {
-                                                    v = v.trim()
+                                                    v = code?v.trimEnd():v.trim()
                                                     if (o.length === 0) o.push([])
+                                                    if(!code && v.includes("{{")) code=true
+                                                    else if(code && v.includes("}}")) code=false
                                                     if (v === '----') o.push([])
                                                     else {
                                                         o[o.length - 1].push(v)
                                                     }
                                                     return o
                                                 }, [])
+                                                code=false
                                                 const val = data.filter(p => !p.done).reduce((m, v, i) => {
                                                     m.set(i, v)
                                                     return m
@@ -3628,13 +3632,11 @@
                                                 blocks.forEach((b, i) => {
                                                     let v = "";
                                                     const last = b.length - 1
-                                                    let code=false
                                                     b.filter(l => l.length > 0).forEach((l, x) => {
                                                         if(l==='\n'||l.length===0) return
                                                         v += l
-                                                        if(l.endsWith("{{")) code=true
-                                                        else if(code && l.startsWith("}}")) code=false
-
+                                                        if(!code && v.includes("{{")) code=true
+                                                        else if(code && v.includes("}}")) code=false
                                                         if (!code &&!l.startsWith("#") &&!l.startsWith("w:")) v += "\n"
                                                         if(x < last) v+="\n"
                                                     })
