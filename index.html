@@ -3617,7 +3617,7 @@
                                                     v = code?v.trimEnd():v.trim()
                                                     if (o.length === 0) o.push([])
                                                     if(!code && v.includes("{{")) code=true
-                                                    else if(code && v.includes("}}")) code=false
+                                                    if(code && v.includes("}}")) code=false
                                                     if (v === '----') o.push([])
                                                     else {
                                                         o[o.length - 1].push(v)
@@ -3636,7 +3636,7 @@
                                                         if(l==='\n'||l.length===0) return
                                                         v += l
                                                         if(!code && v.includes("{{")) code=true
-                                                        else if(code && v.includes("}}")) code=false
+                                                        if(code && v.includes("}}")) code=false
                                                         if (!code &&!l.startsWith("#") &&!l.startsWith("w:")) v += "\n"
                                                         if(x < last) v+="\n"
                                                     })
