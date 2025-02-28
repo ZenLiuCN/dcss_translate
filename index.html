@@ -3364,10 +3364,28 @@
          * done:boolean
          * }} Entry
          */
+        /**
+         *
+         * @typedef {Record<string,Array<{topic:string,done:number,total:number}>>} Catalogs
+         */
 
         const {div, details, summary, label, input, article, table, thead, th, tbody, tr, td, textarea} = vans.tags
         const prog = vans.state(true)
         const normal = vans.state(true)
+        const autoDoneRun=vans.state(false)
+        /**
+         *
+         * @type {vans.State<Catalogs>}
+         */
+        const catalog = vans.state({})
+        const catalogReady = vans.state(false)
+        const host = ""
+        /**
+         *
+         * @param {string}s
+         * @returns {number}
+         */
+        const computeLines=s=>s.split('\n').length
         const submit = async (e, done) => {
             const r = await fetch(`${host}/entry/${e.id}${done ? "/done" : ""}`, {
                 method: 'POST',
@@ -3412,12 +3430,17 @@
             const sync = vans.state(false)
             const trans = vans.state(vans.raw(e).trans)
             let timeout = null
+            const lines=computeLines(e.eng)
             const e0 = textarea({
+                wrap:"off",
                 style: "resize:none",
+                rows:lines,
                 readOnly: true
             }, e.eng)
             const e1 = textarea({
+                wrap:"off",
                 style: "resize:vertical",
+                rows:lines,
                 placeholder: "your translation",
                 oninput: x => {
                     trans.val = x.target.value
@@ -3444,7 +3467,7 @@
                             style: actionBtn,
                             onclick: () => {
                                 trans.val = e.eng
-                                e.trans.val=e.eng
+                                e.trans=e.eng
                             }
                         }, 'Copy'),
                         div({
@@ -3481,13 +3504,9 @@
                 }
             ]
         }
-        /**
-         *
-         * @type {vans.State<Record<string,Array<{topic:string,done:number,total:number}>>>}
-         */
-        const catalog = vans.state({})
-        const catalogReady = vans.state(false)
-        const host = ""
+
+
+
         const catalogLoad = async () => {
             const r = await fetch(`${host}/entries/`)
             if (r.status === 200) {
@@ -3583,7 +3602,7 @@
             : div(...Object.keys(catalog.val).map(i => card(i, catalog.val[i])))
         const loading = () => div({ariaBusy: "true"}, 'Loading')
         init()
-        const autoDoneRun=vans.state(false)
+
         vans.add(document.body, () => article({class: "container-fluid"},
             div({role: "group",style:"align-items: center"},
                 label(input({
