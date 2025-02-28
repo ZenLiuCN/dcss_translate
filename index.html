@@ -3372,6 +3372,11 @@
         const {div, details, summary, label, input, article, table, thead, th, tbody, tr, td, textarea} = vans.tags
         const prog = vans.state(true)
         const normal = vans.state(true)
+
+        const prompt = vans.state(localStorage.getItem("prompt")??"")
+        vans.derive(()=>{
+            localStorage.setItem("prompt",prompt.val)
+        })
         const autoDoneRun=vans.state(false)
         /**
          *
@@ -3431,6 +3436,16 @@
             const trans = vans.state(vans.raw(e).trans)
             let timeout = null
             const lines=computeLines(e.eng)
+            const handleValue= x => {
+                trans.val = x.target.value
+                if (timeout) clearTimeout(timeout)
+                sync.val = true
+                timeout = setTimeout(() => {
+                    e.trans = trans.val
+                    sync.val = false
+
+                }, 1000)
+            }
             const e0 = textarea({
                 wrap:"off",
                 style: "resize:none",
@@ -3442,22 +3457,15 @@
                 style: "resize:vertical",
                 rows:lines,
                 placeholder: "your translation",
-                oninput: x => {
-                    trans.val = x.target.value
-                    if (timeout) clearTimeout(timeout)
-                    sync.val = true
-                    timeout = setTimeout(() => {
-                        e.trans = trans.val
-                        sync.val = false
-
-                    }, 1000)
-                },
+                onparse:handleValue,
+                oninput: handleValue,
                 value: () => trans.val
             })
             const observer = new ResizeObserver(e => {
                 e0.style.height = e1.style.height
             })
             observer.observe(e1)
+
             return [
                 tr(td(div({style: `${e.done ? "color:deeppink;font-size:1rem" : "font-size:1rem"}`}, e.type)), td(div(e.id)),
                     td(div({role: 'group'},
@@ -3589,6 +3597,9 @@
                                 th({colSpan: 2}, "Translation"),
                             ),
                             tbody(
+                                prog.val? tr(
+                                    td({colSpan:3},div({role:"button",onclick:()=>navigator.clipboard.writeText(prompt.val+"\n"+data.filter(p=>!p.done).map(p=>p.eng).join("\n----\n")).then(_=>alert("already copy to clipboard"))},"Copy To Clipboard (with prompt text at first)"))
+                                ):undefined,
                                 ...[...(prog.val ? data.filter(p => !p.done) : data).map((d) => render(d)).flat(), nextPage(loader, more)]
                             )
                         )
@@ -3623,7 +3634,10 @@
                 div({role:"button",
                     "data-tooltip":"convert all translated entries to finished",
                     'data-placement':"bottom",
-                    ariaBusy:autoDoneRun,onclick:()=>autoDone(autoDoneRun)},"Automatic Finish")
+                    ariaBusy:autoDoneRun,onclick:()=>autoDone(autoDoneRun)},"Automatic Finish"),
+                div(div("prompt"),textarea({ wrap:"off",
+                    style: "resize:vertical",
+                    onchange:e=>prompt.val=e.target.value},prompt.val)),
             ), entries()))
 
     })();
